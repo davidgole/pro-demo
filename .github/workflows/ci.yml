@@ -1,0 +1,89 @@
+name: Python CI/CD Pipeline
+
+on: [push]
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+      
+    - name: Run tests
+      run: pytest tests/ --junitxml=test-results.xml
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-linux
+        path: test-results.xml
+
+  analyze-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+      
+    - name: Run static analysis
+      run: pylint src/ --output-format=json:pylint-results.json || echo "Pylint finished"
+      
+    - name: Upload analysis results
+      uses: actions/upload-artifact@v3
+      with:
+        name: pylint-results
+        path: pylint-results.json
+      
+    - name: Generate executable
+      run: |
+        pyinstaller --onefile src/main.py
+        mkdir dist-artifact
+        copy dist\main.exe dist-artifact\
+        
+    - name: Upload executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-executable
+        path: dist-artifact/main.exe
+
+  local-runner-job:
+    runs-on: self-hosted
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Verify environment
+      run: |
+        python --version
+        echo "Running on self-hosted runner"
+        
+    - name: Create build info
+      run: |
+        echo "Build date: $(date)" > build-info.txt
+        echo "Git commit: $GITHUB_SHA" >> build-info.txt
+        
+    - name: Upload build info
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-info
+        path: build-info.txt
